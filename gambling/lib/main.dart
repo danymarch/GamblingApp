@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'DatabaseHelper.dart';
 
 void main() {
   runApp(const SlotMachine());
@@ -32,7 +33,20 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _objectiveController = TextEditingController();
   int? objective;
 
-  void play() {
+  final DatabaseHelper dbHelper = DatabaseHelper();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    balance = await dbHelper.getBalance();
+    setState(() {});
+  }
+
+  void play() async {
     if (balance <= 0) {
       showLossDialog();
       return;
@@ -58,12 +72,14 @@ class _HomePageState extends State<HomePage> {
 
     int numero = random.nextInt(2);
     if (numero == 1) {
-      int goall = goal*2;
+      int goall = goal * 2;
       balance += goall;
+      await dbHelper.updateBalance(balance);
       resultMessage = "Hai vinto €$goall!";
       resultColor = Colors.green;
     } else {
       balance -= goal;
+      await dbHelper.updateBalance(balance);
       resultMessage = "Hai perso €$goal.";
       resultColor = Colors.red;
     }
@@ -74,6 +90,18 @@ class _HomePageState extends State<HomePage> {
 
     setState(() {});
     _goalController.clear();
+  }
+
+  Future<void> _reset() async {
+    balance = 100;
+    await dbHelper.updateBalance(balance);
+    setState(() {
+      objective = null;
+      resultMessage = "";
+      resultColor = Colors.black;
+      _goalController.clear();
+      _objectiveController.clear();
+    });
   }
 
   void _showSnackBar(String message) {
@@ -111,11 +139,14 @@ class _HomePageState extends State<HomePage> {
                   _showSnackBar('Inserisci un obiettivo valido.');
                   return;
                 }
-                objective = int.tryParse(_objectiveController.text);
-                if (objective == null || objective! <= 0) {
-                  _showSnackBar('Inserisci un numero valido.');
+                int? newObjective = int.tryParse(_objectiveController.text);
+                if (newObjective == null || newObjective <= 0 || newObjective > balance + 1000 || newObjective - balance < 100) {
+                  _showSnackBar('Obiettivo non valido. Inserisci un obiettivo compreso tra il saldo + 100 e saldo + 1000.');
                   return;
                 }
+                setState(() {
+                  objective = newObjective;
+                });
                 Navigator.of(context).pop();
               },
             ),
@@ -137,6 +168,7 @@ class _HomePageState extends State<HomePage> {
               child: const Text('Ok'),
               onPressed: () {
                 Navigator.of(context).pop();
+                _reset();
               },
             ),
           ],
@@ -151,7 +183,7 @@ class _HomePageState extends State<HomePage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Hai vinto!'),
-          content: Text('Hai raggiunto il tuo obiettivo di €$objective!'),
+          content: Text('Hai raggiunto il tuo obiettivo di €$objective! Il tuo saldo è stato raddoppiato!'),
           actions: [
             TextButton(
               child: const Text('Riavvia'),
@@ -175,15 +207,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _reset() {
-    setState(() {
-      balance = 100;
-      objective = null;
-      resultMessage = "";
-      resultColor = Colors.black;
-      _goalController.clear();
-      _objectiveController.clear();
-    });
+  void allIn() async {
+    if (balance <= 0) {
+      showLossDialog();
+      return;
+    }
+
+    int numero = random.nextInt(2);
+    if (numero == 1) {
+      balance *= 15;
+      resultMessage = "Hai vinto! Il saldo è stato moltiplicato per 15!";
+      resultColor = Colors.green;
+    } else {
+      balance = 0;
+      resultMessage = "Hai perso tutto!";
+      resultColor = Colors.red;
+    }
+
+    await dbHelper.updateBalance(balance);
+    setState(() {});
   }
 
   @override
@@ -229,9 +271,23 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: play,
-              child: const Text('Gioca'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: allIn,
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white, // Imposta il colore del testo a bianco
+                    backgroundColor: Colors.blue,  // Mantieni il background blu o un colore simile
+                  ),
+                  child: const Text('All-in'),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: play,
+                  child: const Text('Gioca'),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             if (objective != null)
