@@ -30,13 +30,13 @@ class DatabaseHelper {
       )
     ''');
     // Imposta un saldo iniziale se non esiste già
-    await db.insert('settings', {'id': 1, 'balance': 100});
+    await db.insert('settings', {'id': 1, 'balance': 1000});
   }
 
   Future<int> getBalance() async {
     final db = await database;
     List<Map<String, dynamic>> result = await db.query('settings', where: 'id = ?', whereArgs: [1]);
-    return result.isNotEmpty ? result.first['balance'] : 100;
+    return result.isNotEmpty ? result.first['balance'] : 1000;
   }
 
   Future<void> updateBalance(int balance) async {
